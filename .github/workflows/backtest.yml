@@ -1,0 +1,50 @@
+name: Run Backtest
+
+on:
+  workflow_dispatch:
+    inputs:
+      period:
+        description: 'Backtest period (e.g., "Jan 2024 - Dec 2024")'
+        required: true
+        default: 'Jan 2024 - Dec 2024'
+      asset:
+        description: 'Specific asset to backtest (leave empty for all assets)'
+        required: false
+        default: ''
+
+env:
+  OANDA_API_KEY: ${{ secrets.OANDA_API_KEY }}
+  OANDA_ACCOUNT_ID: ${{ secrets.OANDA_ACCOUNT_ID }}
+
+jobs:
+  backtest:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install pandas numpy requests python-dotenv
+      
+      - name: Run Backtest
+        run: |
+          python run_backtest_2024.py
+        env:
+          OANDA_API_KEY: ${{ secrets.OANDA_API_KEY }}
+          OANDA_ACCOUNT_ID: ${{ secrets.OANDA_ACCOUNT_ID }}
+      
+      - name: Upload Results
+        uses: actions/upload-artifact@v4
+        with:
+          name: backtest-results
+          path: backtest_results_2024.json
+          if-no-files-found: warn
