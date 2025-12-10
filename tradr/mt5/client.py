@@ -477,13 +477,78 @@ class MT5Client:
         
         return result is not None and result.retcode == mt5.TRADE_RETCODE_DONE
     
+    def get_available_symbols(self) -> List[str]:
+        """Get list of all available symbols from broker."""
+        if not self.connected:
+            return []
+        
+        mt5 = self._import_mt5()
+        symbols = mt5.symbols_get()
+        
+        if symbols is None:
+            return []
+        
+        return [s.name for s in symbols]
+    
+    def find_symbol_match(self, desired_symbol: str) -> Optional[str]:
+        """
+        Find the broker's symbol name that matches our desired symbol.
+        
+        Tries multiple naming conventions:
+        - EURUSD, EURUSDm, EURUSD.a, EUR/USD, etc.
+        """
+        if not self.connected:
+            return None
+        
+        mt5 = self._import_mt5()
+        
+        # Try exact match first
+        if mt5.symbol_info(desired_symbol):
+            return desired_symbol
+        
+        # Generate candidates based on common broker naming patterns
+        base = desired_symbol.replace("_", "").replace("/", "").replace(".", "")
+        
+        candidates = [
+            desired_symbol,                    # EURUSD
+            base,                              # EURUSD
+            f"{base}m",                        # EURUSDm (mini)
+            f"{base}.a",                       # EURUSD.a
+            f"{base}.",                        # EURUSD.
+            f"{base}pro",                      # EURUSDpro
+            f"{base}_",                        # EURUSD_
+            f"{base[:3]}/{base[3:]}",         # EUR/USD
+            f"{base[:3]}.{base[3:]}",         # EUR.USD
+        ]
+        
+        # For crypto/indices with suffixes
+        if any(x in desired_symbol for x in ["BTC", "ETH", "US500", "US100"]):
+            candidates.extend([
+                f"{base}cash",
+                f"{base}.cash",
+                f"{base}_cash",
+            ])
+        
+        for candidate in candidates:
+            info = mt5.symbol_info(candidate)
+            if info is not None:
+                return candidate
+        
+        return None
+    
     def get_symbol_info(self, symbol: str) -> Optional[Dict]:
         """Get symbol information."""
         if not self.connected:
             return None
         
         mt5 = self._import_mt5()
-        info = mt5.symbol_info(symbol)
+        
+        # Try to find matching symbol first
+        matched_symbol = self.find_symbol_match(symbol)
+        if matched_symbol is None:
+            return None
+        
+        info = mt5.symbol_info(matched_symbol)
         
         if info is None:
             return None

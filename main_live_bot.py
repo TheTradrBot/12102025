@@ -128,6 +128,7 @@ class LiveTradingBot:
         self.last_validate_time: Optional[datetime] = None
         self.scan_count = 0
         self.pending_setups: Dict[str, PendingSetup] = {}
+        self.symbol_map: Dict[str, str] = {}  # our_symbol -> broker_symbol
         
         self.challenge_manager: Optional[ChallengeRiskManager] = None
         
@@ -182,6 +183,35 @@ class LiveTradingBot:
         log.info(f"Equity: ${account.get('equity', 0):,.2f}")
         log.info(f"Leverage: 1:{account.get('leverage', 0)}")
         
+        # Discover available symbols
+        log.info("\n" + "=" * 70)
+        log.info("DISCOVERING BROKER SYMBOLS")
+        log.info("=" * 70)
+        
+        available_symbols = self.mt5.get_available_symbols()
+        log.info(f"Broker has {len(available_symbols)} total symbols")
+        
+        # Map our symbols to broker symbols
+        mapped_count = 0
+        self.symbol_map = {}
+        
+        for our_symbol in TRADABLE_SYMBOLS:
+            broker_symbol = self.mt5.find_symbol_match(our_symbol)
+            if broker_symbol:
+                self.symbol_map[our_symbol] = broker_symbol
+                mapped_count += 1
+                log.info(f"✓ {our_symbol:15s} -> {broker_symbol}")
+            else:
+                log.warning(f"✗ {our_symbol:15s} -> NOT FOUND")
+        
+        log.info("=" * 70)
+        log.info(f"Mapped {mapped_count}/{len(TRADABLE_SYMBOLS)} symbols")
+        log.info("=" * 70)
+        
+        if mapped_count == 0:
+            log.error("No symbols could be mapped! Check broker symbol naming.")
+            return False
+        
         balance = account.get('balance', 0)
         equity = account.get('equity', 0)
         if balance > 0:
@@ -229,11 +259,14 @@ class LiveTradingBot:
         Get multi-timeframe candle data for a symbol.
         Same timeframes used in backtests for parity.
         """
+        # Use broker symbol format
+        broker_symbol = self.symbol_map.get(symbol, symbol)
+        
         data = {
-            "monthly": self.mt5.get_ohlcv(symbol, "MN1", 24),
-            "weekly": self.mt5.get_ohlcv(symbol, "W1", 104),
-            "daily": self.mt5.get_ohlcv(symbol, "D1", 500),
-            "h4": self.mt5.get_ohlcv(symbol, "H4", 500),
+            "monthly": self.mt5.get_ohlcv(broker_symbol, "MN1", 24),
+            "weekly": self.mt5.get_ohlcv(broker_symbol, "W1", 104),
+            "daily": self.mt5.get_ohlcv(broker_symbol, "D1", 500),
+            "h4": self.mt5.get_ohlcv(broker_symbol, "H4", 500),
         }
         return data
     
@@ -257,9 +290,15 @@ class LiveTradingBot:
         
         Returns trade setup dict if signal is active, None otherwise.
         """
-        log.info(f"[{symbol}] Scanning...")
+        # Skip if symbol not available on broker
+        if symbol not in self.symbol_map:
+            log.debug(f"[{symbol}] Not available on this broker, skipping")
+            return None
         
-        if self.check_existing_position(symbol):
+        broker_symbol = self.symbol_map[symbol]
+        log.info(f"[{symbol}] Scanning (broker: {broker_symbol})...")
+        
+        if self.check_existing_position(broker_symbol):
             log.info(f"[{symbol}] Already in position, skipping")
             return None
         
@@ -1025,12 +1064,11 @@ class LiveTradingBot:
         signals_found = 0
         orders_placed = 0
         
-        for symbol in TRADABLE_SYMBOLS:
+        # Only scan symbols that are available on broker
+        available_symbols = [s for s in TRADABLE_SYMBOLS if s in self.symbol_map]
+        
+        for symbol in available_symbols:
             try:
-                symbol_info = self.mt5.get_symbol_info(symbol)
-                if symbol_info is None:
-                    log.warning(f"[{symbol}] Symbol not available on this broker")
-                    continue
                 
                 setup = self.scan_symbol(symbol)
                 
