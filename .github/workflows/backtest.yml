@@ -2,19 +2,6 @@ name: Run Backtest
 
 on:
   workflow_dispatch:
-    inputs:
-      period:
-        description: 'Backtest period (e.g., "Jan 2024 - Dec 2024")'
-        required: true
-        default: 'Jan 2024 - Dec 2024'
-      asset:
-        description: 'Specific asset to backtest (leave empty for all assets)'
-        required: false
-        default: ''
-
-env:
-  OANDA_API_KEY: ${{ secrets.OANDA_API_KEY }}
-  OANDA_ACCOUNT_ID: ${{ secrets.OANDA_ACCOUNT_ID }}
 
 jobs:
   backtest:

@@ -19,18 +19,29 @@ import sys
 import json
 from datetime import datetime
 
-# Check for OANDA credentials in environment
-if not os.getenv("OANDA_API_KEY") or not os.getenv("OANDA_ACCOUNT_ID"):
-    print("=" * 70)
-    print("OANDA API CREDENTIALS REQUIRED")
-    print("=" * 70)
-    print()
-    print("Please set the following environment variables:")
-    print("  export OANDA_API_KEY='your_api_key'")
-    print("  export OANDA_ACCOUNT_ID='your_account_id'")
-    print()
-    print("Or configure them as GitHub Secrets and run via GitHub Actions.")
-    print("=" * 70)
+
+def check_credentials():
+    """Check if OANDA API credentials are configured."""
+    api_key = os.getenv("OANDA_API_KEY")
+    account_id = os.getenv("OANDA_ACCOUNT_ID")
+    
+    if not api_key or not account_id:
+        print("=" * 70)
+        print("OANDA API CREDENTIALS REQUIRED")
+        print("=" * 70)
+        print()
+        print("Please set the following environment variables:")
+        print("  export OANDA_API_KEY='your_api_key'")
+        print("  export OANDA_ACCOUNT_ID='your_account_id'")
+        print()
+        print("Or configure them as GitHub Secrets and run via GitHub Actions.")
+        print("=" * 70)
+        return False
+    
+    return True
+
+
+if not check_credentials():
     sys.exit(1)
 
 # Import after setting env vars
