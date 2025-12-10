@@ -17,3 +17,7 @@ python-dotenv
 flask
 flask-cors
 python-dotenv
+discord.py
+numpy
+pandas
+requests
